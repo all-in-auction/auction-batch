@@ -7,5 +7,6 @@ spring:
   batch:
     job:
       enabled: false
+      chunk-size: 1000
     jdbc:
       initialize-schema: always
