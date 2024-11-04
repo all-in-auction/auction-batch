@@ -1,6 +1,6 @@
 package com.auction.domain.coupon.config;
 
-import com.auction.domain.coupon.entity.CouponUser;
+import com.auction.domain.coupon.dto.CouponDto;
 import com.auction.domain.coupon.listener.CheckExpireCouponListener;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,8 +10,8 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
-import org.springframework.batch.item.database.JpaItemWriter;
-import org.springframework.batch.item.database.JpaPagingItemReader;
+import org.springframework.batch.item.database.JdbcBatchItemWriter;
+import org.springframework.batch.item.database.JdbcPagingItemReader;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -37,18 +37,14 @@ public class CheckExpireCouponConfig {
     @Bean
     public Step checkExpireCouponStep(
             JobRepository jobRepository,
-            JpaPagingItemReader<CouponUser> getExpireCouponReader,
-            JpaItemWriter<CouponUser> deleteExpireCouponWriter,
+            JdbcPagingItemReader<CouponDto> getExpireCouponReader,
+            JdbcBatchItemWriter<CouponDto> deleteExpireCouponWriter,
             CheckExpireCouponListener checkExpireCouponListener,
             PlatformTransactionManager platformTransactionManager
     ) {
         return new StepBuilder("checkExpireCouponStep", jobRepository)
-                .<CouponUser, CouponUser>chunk(1000, platformTransactionManager)
+                .<CouponDto, CouponDto>chunk(1000, platformTransactionManager)
                 .reader(getExpireCouponReader)
-                .processor(couponUser -> {
-                    couponUser.changeUnavailable();
-                    return couponUser;
-                })
                 .writer(deleteExpireCouponWriter)
                 .listener(checkExpireCouponListener)
                 .build();
