@@ -12,8 +12,10 @@ import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.JdbcPagingItemReader;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import static com.auction.common.constants.BatchConst.CHECK_EXPIRE_COUPON_JOB;
@@ -22,6 +24,10 @@ import static com.auction.common.constants.BatchConst.CHECK_EXPIRE_COUPON_JOB;
 @Configuration
 @RequiredArgsConstructor
 public class CheckExpireCouponConfig {
+
+    @Value("${spring.batch.job.chunk-size}")
+    private int chunkSize;
+
     @Bean
     public Job checkExpireCouponJob(
             JobRepository jobRepository,
@@ -35,6 +41,22 @@ public class CheckExpireCouponConfig {
     }
 
     @Bean
+    public ThreadPoolTaskExecutor threadPoolTaskExecutor() {
+        int numOfCores = Runtime.getRuntime().availableProcessors();
+        float targetCpuUtil = 0.3f;
+        float blockingCoefficient = 0.1f;
+        int threadPoolSize = Math.round(numOfCores * targetCpuUtil * (1 + blockingCoefficient));
+
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(threadPoolSize);
+        executor.setMaxPoolSize(threadPoolSize);
+        executor.setThreadNamePrefix("expire-coupon-thread-");
+        executor.initialize();
+
+        return executor;
+    }
+
+    @Bean
     public Step checkExpireCouponStep(
             JobRepository jobRepository,
             JdbcPagingItemReader<CouponDto> getExpireCouponReader,
@@ -43,10 +65,11 @@ public class CheckExpireCouponConfig {
             PlatformTransactionManager platformTransactionManager
     ) {
         return new StepBuilder("checkExpireCouponStep", jobRepository)
-                .<CouponDto, CouponDto>chunk(1000, platformTransactionManager)
+                .<CouponDto, CouponDto>chunk(chunkSize, platformTransactionManager)
                 .reader(getExpireCouponReader)
                 .writer(deleteExpireCouponWriter)
                 .listener(checkExpireCouponListener)
+                .taskExecutor(threadPoolTaskExecutor())
                 .build();
     }
 }

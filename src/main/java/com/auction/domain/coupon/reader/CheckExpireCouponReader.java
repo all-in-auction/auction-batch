@@ -1,17 +1,13 @@
 package com.auction.domain.coupon.reader;
 
 import com.auction.domain.coupon.dto.CouponDto;
-import com.auction.domain.coupon.entity.CouponUser;
-import jakarta.persistence.EntityManagerFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.item.database.JdbcPagingItemReader;
-import org.springframework.batch.item.database.JpaPagingItemReader;
 import org.springframework.batch.item.database.Order;
 import org.springframework.batch.item.database.PagingQueryProvider;
 import org.springframework.batch.item.database.builder.JdbcPagingItemReaderBuilder;
-import org.springframework.batch.item.database.builder.JpaPagingItemReaderBuilder;
 import org.springframework.batch.item.database.support.SqlPagingQueryProviderFactoryBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -28,6 +24,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CheckExpireCouponReader {
     private final DataSource dataSource;
+
+    @Value("${spring.batch.job.chunk-size}")
+    private int chunkSize;
 
 //    @Bean
 //    @StepScope
@@ -59,12 +58,13 @@ public class CheckExpireCouponReader {
 
         return new JdbcPagingItemReaderBuilder<CouponDto>()
                 .name("couponIdPagingReader")
-                .pageSize(1000)
-                .fetchSize(1000)
+                .pageSize(chunkSize)
+                .fetchSize(chunkSize)
                 .dataSource(dataSource)
                 .rowMapper(new BeanPropertyRowMapper<>(CouponDto.class))
                 .queryProvider(queryProvider)
                 .parameterValues(parameters)
+                .saveState(false)
                 .build();
     }
 
