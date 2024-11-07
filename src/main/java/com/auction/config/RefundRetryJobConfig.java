@@ -15,6 +15,7 @@ import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.JpaPagingItemReader;
 import org.springframework.batch.item.database.builder.JpaPagingItemReaderBuilder;
 import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -22,13 +23,14 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
 
+import static com.auction.common.constants.BatchConst.MASTER_DATASOURCE;
+
 @Configuration
 @RequiredArgsConstructor
 public class RefundRetryJobConfig {
 
     private final RefundService refundService;
     private final EntityManagerFactory emf;
-    private final DataSource dataSource;
 
     @Bean
     public Job refundRetryJob(JobRepository jobRepository, Step refundRetryStep) {
@@ -38,7 +40,12 @@ public class RefundRetryJobConfig {
     }
 
     @Bean
-    public Step refundRetryStep(JobRepository jobRepository, Tasklet testTasklet, PlatformTransactionManager platformTransactionManager) {
+    public Step refundRetryStep(
+            JobRepository jobRepository,
+            Tasklet testTasklet,
+            PlatformTransactionManager platformTransactionManager,
+            @Qualifier(MASTER_DATASOURCE) DataSource dataSource
+    ) {
         return new StepBuilder("refundRetryStep", jobRepository)
                 .<RefundLog, RefundLog>chunk(100, platformTransactionManager)
                 .reader(failedRefundReader(emf))
@@ -48,7 +55,7 @@ public class RefundRetryJobConfig {
     }
 
     @Bean
-    public Tasklet testTasklet(){
+    public Tasklet testTasklet() {
         return ((contribution, chunkContext) -> RepeatStatus.FINISHED);
     }
 
@@ -56,7 +63,7 @@ public class RefundRetryJobConfig {
     public ItemProcessor<RefundLog, RefundLog> failedRefundProcessor() {
         return refundLog -> {
             try {
-                if(!refundLog.isConsumed()) {
+                if (!refundLog.isConsumed()) {
                     // 환불 재시도
                     refundService.processRefund(refundLog.getUser().getId(),
                             refundLog.getAuction().getId(),

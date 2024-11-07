@@ -1,6 +1,6 @@
 spring:
   profiles:
-    active: ${ACTIVE_PROFILE}
+    active: prod
   config:
     import: optional:file:.env[.properties]
 
@@ -10,4 +10,9 @@ spring:
       chunk-size: 1000
       pool-size: 5
     jdbc:
-      initialize-schema: always
+      initialize-schema: never
+
+logging:
+  level:
+    com.zaxxer.hikari.HikariConfig: DEBUG
+    com.zaxxer.hikari: TRACE
