@@ -1,11 +1,13 @@
 spring:
   profiles:
-    active: dev
+    active: ${ACTIVE_PROFILE}
   config:
     import: optional:file:.env[.properties]
 
   batch:
     job:
       enabled: false
+      chunk-size: 1000
+      pool-size: 5
     jdbc:
       initialize-schema: always
