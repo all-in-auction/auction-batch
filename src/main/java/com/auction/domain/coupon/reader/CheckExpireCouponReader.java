@@ -9,6 +9,7 @@ import org.springframework.batch.item.database.Order;
 import org.springframework.batch.item.database.PagingQueryProvider;
 import org.springframework.batch.item.database.builder.JdbcPagingItemReaderBuilder;
 import org.springframework.batch.item.database.support.SqlPagingQueryProviderFactoryBean;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,12 +20,12 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.auction.common.constants.BatchConst.SLAVE_DATASOURCE;
+
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
 public class CheckExpireCouponReader {
-    private final DataSource dataSource;
-
     @Value("${spring.batch.job.chunk-size}")
     private int chunkSize;
 
@@ -86,6 +87,7 @@ public class CheckExpireCouponReader {
     @StepScope
     public JdbcPagingItemReader<CouponDto> getExpireCouponReader(
             PagingQueryProvider queryProvider,
+            @Qualifier(SLAVE_DATASOURCE) DataSource dataSource,
             @Value("#{stepExecutionContext['minValue']}") Long minValue,
             @Value("#{stepExecutionContext['maxValue']}") Long maxValue,
             @Value("#{jobParameters['expireAt']}") LocalDate expireAt
@@ -108,7 +110,9 @@ public class CheckExpireCouponReader {
     }
 
     @Bean
-    public PagingQueryProvider queryProvider() throws Exception {
+    public PagingQueryProvider queryProvider(
+            @Qualifier(SLAVE_DATASOURCE) DataSource dataSource
+    ) throws Exception {
         SqlPagingQueryProviderFactoryBean queryProvider = new SqlPagingQueryProviderFactoryBean();
         queryProvider.setDataSource(dataSource);
         queryProvider.setSelectClause("SELECT u.id");

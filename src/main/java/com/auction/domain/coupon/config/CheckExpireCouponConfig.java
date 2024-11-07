@@ -15,6 +15,7 @@ import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.JdbcPagingItemReader;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,13 +25,12 @@ import org.springframework.transaction.PlatformTransactionManager;
 import javax.sql.DataSource;
 
 import static com.auction.common.constants.BatchConst.CHECK_EXPIRE_COUPON_JOB;
+import static com.auction.common.constants.BatchConst.SLAVE_DATASOURCE;
 
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
 public class CheckExpireCouponConfig {
-    private final DataSource dataSource;
-
     @Value("${spring.batch.job.chunk-size}")
     private int chunkSize;
 
@@ -80,7 +80,9 @@ public class CheckExpireCouponConfig {
 
     @Bean
     @StepScope
-    public CouponPartitioner partitioner() {
+    public CouponPartitioner partitioner(
+            @Qualifier(SLAVE_DATASOURCE) DataSource dataSource
+    ) {
         return new CouponPartitioner(dataSource, "coupon_user", "id");
     }
 
@@ -88,10 +90,11 @@ public class CheckExpireCouponConfig {
     public Step checkExpireCouponMasterStep(
             JobRepository jobRepository,
             Step checkExpireCouponSlaveStep,
+            @Qualifier(SLAVE_DATASOURCE) DataSource dataSource,
             TaskExecutorPartitionHandler taskExecutorPartitionHandler
     ) {
         return new StepBuilder("checkExpireCouponMasterStep", jobRepository)
-                .partitioner(checkExpireCouponSlaveStep.getName(), partitioner())
+                .partitioner(checkExpireCouponSlaveStep.getName(), partitioner(dataSource))
                 .step(checkExpireCouponSlaveStep)
                 .partitionHandler(taskExecutorPartitionHandler)
                 .build();
