@@ -1,10 +1,12 @@
 package com.auction.domain.coupon.config;
 
 import com.auction.domain.coupon.dto.CouponDto;
+import com.auction.domain.coupon.listener.AfterChunkSleepListener;
 import com.auction.domain.coupon.listener.CheckExpireCouponListener;
 import com.auction.domain.coupon.partitioner.CouponPartitioner;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.JDBCConnectionException;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.StepScope;
@@ -19,6 +21,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.retry.backoff.FixedBackOffPolicy;
+import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -128,7 +132,26 @@ public class CheckExpireCouponConfig {
                 .<CouponDto, CouponDto>chunk(chunkSize, platformTransactionManager)
                 .reader(getExpireCouponReader)
                 .writer(deleteExpireCouponWriter)
+                .listener(new AfterChunkSleepListener(100))
                 .listener(checkExpireCouponListener)
+                .faultTolerant()
+                .retry(JDBCConnectionException.class)
+                .retryPolicy(simpleRetryPolicy())
+                .backOffPolicy(fixedBackOffPolicy())
                 .build();
+    }
+
+    @Bean
+    public FixedBackOffPolicy fixedBackOffPolicy() {
+        FixedBackOffPolicy fixedBackOffPolicy = new FixedBackOffPolicy();
+        fixedBackOffPolicy.setBackOffPeriod(10000);
+        return fixedBackOffPolicy;
+    }
+
+    @Bean
+    public SimpleRetryPolicy simpleRetryPolicy() {
+        SimpleRetryPolicy simpleRetryPolicy = new SimpleRetryPolicy();
+        simpleRetryPolicy.setMaxAttempts(2);
+        return simpleRetryPolicy;
     }
 }
