@@ -39,7 +39,7 @@ public class BatchScheduler {
     }
 
     @Scheduled(cron = "0 0 0 * * ?") // 0시 0분 0초에 실행
-    public void runCheckExpireCoupon() {
+    public void runCheckExpireCouponJob() {
         LocalDate date = LocalDate.now();
         try {
             Job job = jobRegistry.getJob(CHECK_EXPIRE_COUPON_JOB);

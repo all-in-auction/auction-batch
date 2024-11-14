@@ -37,7 +37,7 @@ public class CheckExpireCouponConfig {
     @Value("${spring.batch.job.pool-size}")
     private int poolSize;
 
-    @Bean
+    @Bean(CHECK_EXPIRE_COUPON_JOB)
     public Job checkExpireCouponJob(
             JobRepository jobRepository,
             Step checkExpireCouponMasterStep,
