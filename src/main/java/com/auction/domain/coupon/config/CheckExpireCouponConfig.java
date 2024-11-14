@@ -58,7 +58,7 @@ public class CheckExpireCouponConfig {
         int numOfCores = Runtime.getRuntime().availableProcessors();
         float targetCpuUtil = 0.3f;
         float blockingCoefficient = 0.1f;
-        int threadPoolSize = Math.round(numOfCores * targetCpuUtil * (1 + blockingCoefficient));
+        int threadPoolSize = Math.max(1, Math.round(numOfCores * targetCpuUtil * (1 + blockingCoefficient)));
 
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(threadPoolSize);
