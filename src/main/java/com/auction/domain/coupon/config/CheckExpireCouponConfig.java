@@ -63,6 +63,7 @@ public class CheckExpireCouponConfig {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(threadPoolSize);
         executor.setMaxPoolSize(threadPoolSize);
+        executor.setQueueCapacity(10);
         executor.setThreadNamePrefix("check-expire-coupon-thread-");
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);
