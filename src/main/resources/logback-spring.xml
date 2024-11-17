@@ -7,7 +7,7 @@
 
     <!-- LOGSTASH -->
     <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
-        <destination>localhost:5044</destination>
+        <destination>${LOGSTASH_HOST}:${LOGSTASH_PORT}</destination>
         <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
         <layout class="net.logstash.logback.layout.LogstashLayout">
             <timestampPattern>yyyy-MM-dd' 'HH:mm:ss.SSS</timestampPattern>

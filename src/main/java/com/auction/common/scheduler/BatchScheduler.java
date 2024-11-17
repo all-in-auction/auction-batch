@@ -25,7 +25,7 @@ public class BatchScheduler {
     private final JobLauncher jobLauncher;
     private final JobRegistry jobRegistry;
 
-    @Scheduled(cron = "20 40 3 * * ?") // 0시 0분 0초에 실행
+    @Scheduled(cron = "0 0 0 * * ?") // 0시 0분 0초에 실행
     public void runCheckExpireCouponJob() {
         LocalDate date = LocalDate.now();
         try {
