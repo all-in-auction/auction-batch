@@ -1,6 +1,6 @@
 spring:
   profiles:
-    active: prod
+    active: dev
   config:
     import: optional:file:.env[.properties]
 
@@ -14,5 +14,12 @@ spring:
 
 logging:
   level:
+    com.auction: INFO
     com.zaxxer.hikari.HikariConfig: DEBUG
     com.zaxxer.hikari: TRACE
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,health"
