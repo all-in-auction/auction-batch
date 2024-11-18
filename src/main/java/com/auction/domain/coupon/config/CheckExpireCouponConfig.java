@@ -49,7 +49,7 @@ public class CheckExpireCouponConfig {
             Step checkExpireCouponMasterStep,
             PlatformTransactionManager platformTransactionManager
     ) {
-        return new JobBuilder(CHECK_EXPIRE_COUPON_PREFIX, jobRepository)
+        return new JobBuilder(CHECK_EXPIRE_COUPON_PREFIX + JOB_PREFIX, jobRepository)
                 .incrementer(new RunIdIncrementer())
                 .start(checkExpireCouponMasterStep)
                 .build();
