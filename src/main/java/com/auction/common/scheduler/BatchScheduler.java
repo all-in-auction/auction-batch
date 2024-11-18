@@ -16,12 +16,12 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-import static com.auction.common.constants.BatchConst.CHECK_EXPIRE_COUPON_JOB;
+import static com.auction.common.constants.BatchConst.CHECK_EXPIRE_COUPON_PREFIX;
+import static com.auction.common.constants.BatchConst.JOB_PREFIX;
 
 @Component
 @RequiredArgsConstructor
 public class BatchScheduler {
-
     private final JobLauncher jobLauncher;
     private final JobRegistry jobRegistry;
 
@@ -29,7 +29,7 @@ public class BatchScheduler {
     public void runCheckExpireCouponJob() {
         LocalDate date = LocalDate.now();
         try {
-            Job job = jobRegistry.getJob(CHECK_EXPIRE_COUPON_JOB);
+            Job job = jobRegistry.getJob(CHECK_EXPIRE_COUPON_PREFIX + JOB_PREFIX);
             JobParametersBuilder jobParam = new JobParametersBuilder()
                     .addLocalDateTime("datetime", LocalDateTime.now())
                     .addLocalDate("expireAt", date.minusDays(1));

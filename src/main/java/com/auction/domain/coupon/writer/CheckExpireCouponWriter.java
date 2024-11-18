@@ -18,15 +18,6 @@ import static com.auction.common.constants.BatchConst.MASTER_DATASOURCE;
 @Configuration
 @RequiredArgsConstructor
 public class CheckExpireCouponWriter {
-//    @Bean
-//    @StepScope
-//    public JpaItemWriter<CouponUser> deleteExpireCouponWriter(
-//            EntityManagerFactory entityManagerFactory
-//    ) {
-//        return new JpaItemWriterBuilder<CouponUser>()
-//                .entityManagerFactory(entityManagerFactory)
-//                .build();
-//    }
 
     @Bean
     @StepScope
