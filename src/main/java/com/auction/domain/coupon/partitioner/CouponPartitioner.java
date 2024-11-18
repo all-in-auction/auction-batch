@@ -65,7 +65,7 @@ public class CouponPartitioner implements Partitioner {
 
     private long getMinValue() {
         Long min = jdbcTemplate.queryForObject(
-                "SELECT MIN(" + column + ") from " + table,
+                "SELECT MIN(" + column + ") FROM " + table,
                 Long.class
         );
 
@@ -74,7 +74,7 @@ public class CouponPartitioner implements Partitioner {
 
     private long getMaxValue() {
         Long max = jdbcTemplate.queryForObject(
-                "SELECT MAX(" + column + ") from " + table,
+                "SELECT MAX(" + column + ") FROM " + table,
                 Long.class
         );
 

@@ -1,6 +1,7 @@
 package com.auction.domain.coupon.config;
 
 import com.auction.domain.coupon.dto.CouponDto;
+import com.auction.domain.coupon.listener.AfterChunkSleepListener;
 import com.auction.domain.coupon.listener.CheckExpireCouponListener;
 import com.auction.domain.coupon.partitioner.CouponPartitioner;
 import lombok.RequiredArgsConstructor;
@@ -15,35 +16,40 @@ import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.JdbcPagingItemReader;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.TransientDataAccessException;
+import org.springframework.retry.backoff.FixedBackOffPolicy;
+import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
+import java.sql.SQLRecoverableException;
+import java.util.HashMap;
+import java.util.Map;
 
-import static com.auction.common.constants.BatchConst.CHECK_EXPIRE_COUPON_JOB;
+import static com.auction.common.constants.BatchConst.*;
 
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
 public class CheckExpireCouponConfig {
-    private final DataSource dataSource;
-
     @Value("${spring.batch.job.chunk-size}")
     private int chunkSize;
 
     @Value("${spring.batch.job.pool-size}")
     private int poolSize;
 
-    @Bean
+    @Bean(CHECK_EXPIRE_COUPON_PREFIX + JOB_PREFIX)
     public Job checkExpireCouponJob(
             JobRepository jobRepository,
             Step checkExpireCouponMasterStep,
             PlatformTransactionManager platformTransactionManager
     ) {
-        return new JobBuilder(CHECK_EXPIRE_COUPON_JOB, jobRepository)
+        return new JobBuilder(CHECK_EXPIRE_COUPON_PREFIX + JOB_PREFIX, jobRepository)
                 .incrementer(new RunIdIncrementer())
                 .start(checkExpireCouponMasterStep)
                 .build();
@@ -54,12 +60,12 @@ public class CheckExpireCouponConfig {
         int numOfCores = Runtime.getRuntime().availableProcessors();
         float targetCpuUtil = 0.3f;
         float blockingCoefficient = 0.1f;
-        int threadPoolSize = Math.round(numOfCores * targetCpuUtil * (1 + blockingCoefficient));
+        int threadPoolSize = Math.max(1, Math.round(numOfCores * targetCpuUtil * (1 + blockingCoefficient)));
 
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(threadPoolSize);
         executor.setMaxPoolSize(threadPoolSize);
-        executor.setThreadNamePrefix("check-expire-coupon-thread-");
+        executor.setThreadNamePrefix(CHECK_EXPIRE_COUPON_PREFIX + THREAD_PREFIX);
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);
         executor.initialize();
@@ -80,7 +86,9 @@ public class CheckExpireCouponConfig {
 
     @Bean
     @StepScope
-    public CouponPartitioner partitioner() {
+    public CouponPartitioner partitioner(
+            @Qualifier(SLAVE_DATASOURCE) DataSource dataSource
+    ) {
         return new CouponPartitioner(dataSource, "coupon_user", "id");
     }
 
@@ -88,30 +96,15 @@ public class CheckExpireCouponConfig {
     public Step checkExpireCouponMasterStep(
             JobRepository jobRepository,
             Step checkExpireCouponSlaveStep,
+            @Qualifier(SLAVE_DATASOURCE) DataSource dataSource,
             TaskExecutorPartitionHandler taskExecutorPartitionHandler
     ) {
-        return new StepBuilder("checkExpireCouponMasterStep", jobRepository)
-                .partitioner(checkExpireCouponSlaveStep.getName(), partitioner())
+        return new StepBuilder(CHECK_EXPIRE_COUPON_MASTER_STEP, jobRepository)
+                .partitioner(checkExpireCouponSlaveStep.getName(), partitioner(dataSource))
                 .step(checkExpireCouponSlaveStep)
                 .partitionHandler(taskExecutorPartitionHandler)
                 .build();
     }
-
-//    @Bean
-//    public Step checkExpireCouponStep(
-//            JobRepository jobRepository,
-//            JdbcPagingItemReader<CouponDto> getExpireCouponReader,
-//            JdbcBatchItemWriter<CouponDto> deleteExpireCouponWriter,
-//            CheckExpireCouponListener checkExpireCouponListener,
-//            PlatformTransactionManager platformTransactionManager
-//    ) {
-//        return new StepBuilder("checkExpireCouponStep", jobRepository)
-//                .<CouponDto, CouponDto>chunk(10000, platformTransactionManager)
-//                .reader(getExpireCouponReader)
-//                .writer(deleteExpireCouponWriter)
-//                .listener(checkExpireCouponListener)
-//                .build();
-//    }
 
     @Bean
     public Step checkExpireCouponSlaveStep(
@@ -121,11 +114,33 @@ public class CheckExpireCouponConfig {
             CheckExpireCouponListener checkExpireCouponListener,
             PlatformTransactionManager platformTransactionManager
     ) {
-        return new StepBuilder("checkExpireCouponSlaveStep", jobRepository)
+        return new StepBuilder(CHECK_EXPIRE_COUPON_SLAVE_STEP, jobRepository)
                 .<CouponDto, CouponDto>chunk(chunkSize, platformTransactionManager)
                 .reader(getExpireCouponReader)
                 .writer(deleteExpireCouponWriter)
+                .listener(new AfterChunkSleepListener(100))
                 .listener(checkExpireCouponListener)
+                .faultTolerant()
+                .retryPolicy(simpleRetryPolicy())
+                .backOffPolicy(fixedBackOffPolicy())
                 .build();
+    }
+
+    @Bean
+    public FixedBackOffPolicy fixedBackOffPolicy() {
+        FixedBackOffPolicy fixedBackOffPolicy = new FixedBackOffPolicy();
+        fixedBackOffPolicy.setBackOffPeriod(10000);
+        return fixedBackOffPolicy;
+    }
+
+    @Bean
+    public SimpleRetryPolicy simpleRetryPolicy() {
+        Map<Class<? extends Throwable>, Boolean> retryableExceptions = new HashMap<>();
+        // 복구 가능한 데이터베이스 오류 발생 시 재시도
+        retryableExceptions.put(SQLRecoverableException.class, true);
+        // 커넥션풀 고갈, 트랜잭션 충돌, 데이터 접근 일시적 문제 발생 시 재시도
+        retryableExceptions.put(TransientDataAccessException.class, true);
+
+        return new SimpleRetryPolicy(2, retryableExceptions);
     }
 }

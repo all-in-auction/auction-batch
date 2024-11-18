@@ -6,30 +6,24 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import javax.sql.DataSource;
 
+import static com.auction.common.constants.BatchConst.MASTER_DATASOURCE;
+
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
 public class CheckExpireCouponWriter {
-    private final DataSource dataSource;
-
-//    @Bean
-//    @StepScope
-//    public JpaItemWriter<CouponUser> deleteExpireCouponWriter(
-//            EntityManagerFactory entityManagerFactory
-//    ) {
-//        return new JpaItemWriterBuilder<CouponUser>()
-//                .entityManagerFactory(entityManagerFactory)
-//                .build();
-//    }
 
     @Bean
     @StepScope
-    public JdbcBatchItemWriter<CouponDto> deleteExpireCouponWriter() {
+    public JdbcBatchItemWriter<CouponDto> deleteExpireCouponWriter(
+            @Qualifier(MASTER_DATASOURCE) DataSource dataSource
+    ) {
         return new JdbcBatchItemWriterBuilder<CouponDto>()
                 .dataSource(dataSource)
                 .sql("UPDATE coupon_user SET is_available = false WHERE id = :id AND is_available = true")
