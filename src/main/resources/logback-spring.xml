@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="30 seconds">
+
+    <property name="CONSOLE_LOG_PATTERN"
+              value="[%d{yyyy-MM-dd HH:mm:ss.SSS}:%magenta(${PID:-})][%15(%thread)][%X{X-B3-TraceId:-},%X{X-B3-SpanId:-}] %highlight(%5level) %cyan(%logger{39}) : %msg%n"/>
+    <timestamp key="DATETIME" datePattern="yyyy-MM-dd"/>
+
+    <!-- LOGSTASH -->
+    <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <destination>${LOGSTASH_HOST}:${LOGSTASH_PORT}</destination>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
+        <layout class="net.logstash.logback.layout.LogstashLayout">
+            <timestampPattern>yyyy-MM-dd' 'HH:mm:ss.SSS</timestampPattern>
+        </layout>
+    </appender>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <springProfile name="local">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <springProfile name="dev">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+        <logger name="com.auction.domain.coupon.listener.CheckExpireCouponListener" level="INFO">
+            <appender-ref ref="LOGSTASH"/>
+        </logger>
+    </springProfile>
+
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+        <logger name="com.auction.common.aop.LoggingAspect" level="INFO">
+            <appender-ref ref="LOGSTASH"/>
+        </logger>
+    </springProfile>
+
+</configuration>
