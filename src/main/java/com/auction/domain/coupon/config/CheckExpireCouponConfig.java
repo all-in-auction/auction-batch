@@ -28,6 +28,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
 import java.sql.SQLRecoverableException;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -39,9 +40,6 @@ import static com.auction.common.constants.BatchConst.*;
 public class CheckExpireCouponConfig {
     @Value("${spring.batch.job.chunk-size}")
     private int chunkSize;
-
-    @Value("${spring.batch.job.pool-size}")
-    private int poolSize;
 
     @Bean(CHECK_EXPIRE_COUPON_PREFIX + JOB_PREFIX)
     public Job checkExpireCouponJob(
@@ -59,7 +57,7 @@ public class CheckExpireCouponConfig {
     public ThreadPoolTaskExecutor threadPoolTaskExecutor() {
         int numOfCores = Runtime.getRuntime().availableProcessors();
         float targetCpuUtil = 0.3f;
-        float blockingCoefficient = 0.1f;
+        float blockingCoefficient = 0.2f;
         int threadPoolSize = Math.max(1, Math.round(numOfCores * targetCpuUtil * (1 + blockingCoefficient)));
 
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -77,30 +75,33 @@ public class CheckExpireCouponConfig {
     public TaskExecutorPartitionHandler taskExecutorPartitionHandler(
             Step checkExpireCouponSlaveStep
     ) {
+        int numOfCores = Runtime.getRuntime().availableProcessors();
+
         TaskExecutorPartitionHandler partitionHandler = new TaskExecutorPartitionHandler();
         partitionHandler.setStep(checkExpireCouponSlaveStep);
         partitionHandler.setTaskExecutor(threadPoolTaskExecutor());
-        partitionHandler.setGridSize(poolSize);
+        partitionHandler.setGridSize(numOfCores * 2);
         return partitionHandler;
     }
 
     @Bean
     @StepScope
     public CouponPartitioner partitioner(
-            @Qualifier(SLAVE_DATASOURCE) DataSource dataSource
+            @Qualifier(SLAVE_DATASOURCE) DataSource dataSource,
+            @Value("#{jobParameters['expireAt']}") LocalDate expireAt
     ) {
-        return new CouponPartitioner(dataSource, "coupon_user", "id");
+        return new CouponPartitioner(dataSource, expireAt);
     }
 
     @Bean
     public Step checkExpireCouponMasterStep(
             JobRepository jobRepository,
             Step checkExpireCouponSlaveStep,
-            @Qualifier(SLAVE_DATASOURCE) DataSource dataSource,
+            CouponPartitioner partitioner,
             TaskExecutorPartitionHandler taskExecutorPartitionHandler
     ) {
         return new StepBuilder(CHECK_EXPIRE_COUPON_MASTER_STEP, jobRepository)
-                .partitioner(checkExpireCouponSlaveStep.getName(), partitioner(dataSource))
+                .partitioner(checkExpireCouponSlaveStep.getName(), partitioner)
                 .step(checkExpireCouponSlaveStep)
                 .partitionHandler(taskExecutorPartitionHandler)
                 .build();
@@ -118,7 +119,7 @@ public class CheckExpireCouponConfig {
                 .<CouponDto, CouponDto>chunk(chunkSize, platformTransactionManager)
                 .reader(getExpireCouponReader)
                 .writer(deleteExpireCouponWriter)
-                .listener(new AfterChunkSleepListener(100))
+                .listener(new AfterChunkSleepListener(200))
                 .listener(checkExpireCouponListener)
                 .faultTolerant()
                 .retryPolicy(simpleRetryPolicy())
