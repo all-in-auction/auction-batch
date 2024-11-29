@@ -35,14 +35,14 @@ public class CheckExpireCouponReader {
     public JdbcPagingItemReader<CouponDto> getExpireCouponReader(
             PagingQueryProvider queryProvider,
             @Qualifier(SLAVE_DATASOURCE) DataSource dataSource,
-            @Value("#{stepExecutionContext['minValue']}") Long minValue,
-            @Value("#{stepExecutionContext['maxValue']}") Long maxValue,
+            @Value("#{stepExecutionContext['start']}") int start,
+            @Value("#{stepExecutionContext['end']}") int end,
             @Value("#{jobParameters['expireAt']}") LocalDate expireAt
     ) {
         HashMap<String, Object> parameters = new HashMap<>();
         parameters.put("expire_at", expireAt);
-        parameters.put("min_value", minValue);
-        parameters.put("max_value", maxValue);
+        parameters.put("start", start);
+        parameters.put("end", end);
 
         return new JdbcPagingItemReaderBuilder<CouponDto>()
                 .name(CHECK_EXPIRE_COUPON_PAGING_READER)
@@ -65,12 +65,12 @@ public class CheckExpireCouponReader {
         queryProvider.setSelectClause("SELECT u.id");
         queryProvider.setFromClause("FROM coupon c JOIN coupon_user u ON c.id = u.coupon_id");
         queryProvider.setWhereClause("WHERE c.expire_at = :expire_at AND u.is_available = true " +
-                "AND u.id >= :min_value AND u.id <= :max_value");
+                "AND u.id BETWEEN :start AND :end");
 
         Map<String, Order> sortKeys = new HashMap<>(1);
         sortKeys.put("u.id", Order.ASCENDING);
-
         queryProvider.setSortKeys(sortKeys);
+
         return queryProvider.getObject();
     }
 }

@@ -7,34 +7,48 @@ import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import javax.sql.DataSource;
-import java.util.Collections;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
 public class CouponPartitioner implements Partitioner {
     private final JdbcOperations jdbcTemplate;
-    private final String table;
-    private final String column;
+    private final LocalDate expireAt;
 
-    public CouponPartitioner(DataSource dataSource, String table, String column) {
+    public CouponPartitioner(DataSource dataSource, LocalDate expireAt) {
         this.jdbcTemplate = new JdbcTemplate(dataSource);
-        this.table = table;
-        this.column = column;
+        this.expireAt = expireAt;
     }
 
     @Override
     public Map<String, ExecutionContext> partition(int gridSize) {
-        long min = getMinValue();
-        long max = getMaxValue();
+        // 조건에 맞는 최소, 최대 ID 조회
+        long start = getStart();
+        long end = getEnd();
+        return getExecutionContextMap(start, end, gridSize);
+    }
 
-        if (min == 0 && max == 0) {
-            return Collections.emptyMap();
-        }
+    private long getStart() {
+        Long start = jdbcTemplate.queryForObject(
+                "SELECT MIN(u.id) FROM coupon c JOIN coupon_user u ON c.id = u.coupon_id " +
+                        "WHERE c.expire_at = ? AND u.is_available = true",
+                Long.class,
+                expireAt
+        );
 
-        Map<String, ExecutionContext> result = getExecutionContextMap(min, max, gridSize);
+        return start == null ? 0 : start;
+    }
 
-        return result;
+    private long getEnd() {
+        Long end = jdbcTemplate.queryForObject(
+                "SELECT MAX(u.id) FROM coupon c JOIN coupon_user u ON c.id = u.coupon_id " +
+                        "WHERE c.expire_at = ? AND u.is_available = true",
+                Long.class,
+                expireAt
+        );
+
+        return end == null ? 0 : end;
     }
 
     private static Map<String, ExecutionContext> getExecutionContextMap(long min, long max, int gridSize) {
@@ -53,31 +67,13 @@ public class CouponPartitioner implements Partitioner {
                 end = max;
             }
 
-            value.putLong("minValue", start);
-            value.putLong("maxValue", end);
+            value.putLong("start", start);
+            value.putLong("end", end);
 
             start += targetSize;
             end += targetSize;
             number++;
         }
         return result;
-    }
-
-    private long getMinValue() {
-        Long min = jdbcTemplate.queryForObject(
-                "SELECT MIN(" + column + ") FROM " + table,
-                Long.class
-        );
-
-        return min == null ? 0L : min;
-    }
-
-    private long getMaxValue() {
-        Long max = jdbcTemplate.queryForObject(
-                "SELECT MAX(" + column + ") FROM " + table,
-                Long.class
-        );
-
-        return max == null ? 0L : max;
     }
 }
