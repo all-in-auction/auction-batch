@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.dao.TransientDataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.retry.backoff.FixedBackOffPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -90,7 +91,7 @@ public class CheckExpireCouponConfig {
             @Qualifier(SLAVE_DATASOURCE) DataSource dataSource,
             @Value("#{jobParameters['expireAt']}") LocalDate expireAt
     ) {
-        return new CouponPartitioner(dataSource, expireAt);
+        return new CouponPartitioner(new JdbcTemplate(dataSource), expireAt);
     }
 
     @Bean
