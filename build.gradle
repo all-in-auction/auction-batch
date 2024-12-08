@@ -42,6 +42,12 @@ dependencies {
 
     // logstash
     implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
+
+    // slack-bot
+    implementation 'com.slack.api:slack-api-client:1.44.0'
+
+    // jackson
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.2'
 }
 
 tasks.named('test') {

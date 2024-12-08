@@ -10,6 +10,12 @@ spring:
       chunk-size: 500
     jdbc:
       initialize-schema: never
+  application:
+    name: All In Auction Batch
+
+notification:
+  slack:
+    token: ${SLACK_TOKEN}
 
 logging:
   level:

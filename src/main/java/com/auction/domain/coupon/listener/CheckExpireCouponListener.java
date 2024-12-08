@@ -1,9 +1,12 @@
 package com.auction.domain.coupon.listener;
 
 import com.auction.domain.coupon.dto.CouponLogDto;
+import com.auction.domain.slack.SlackUtils;
+import com.auction.domain.slack.dto.request.SlackMessageRequestDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.*;
@@ -11,11 +14,15 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class CheckExpireCouponListener implements JobExecutionListener, StepExecutionListener {
     private final Logger logger = LoggerFactory.getLogger(CheckExpireCouponListener.class);
     private final ThreadLocal<Long> stepStartTime = new ThreadLocal<>();
+
+    private final ObjectMapper objectMapper;
+    private final SlackUtils slackUtils;
 
     @Override
     public void beforeStep(@NonNull StepExecution stepExecution) {
@@ -39,6 +46,17 @@ public class CheckExpireCouponListener implements JobExecutionListener, StepExec
         logger.info(requestLogDtoToString(couponLogDto));
 
         if (stepExecution.getStatus() == BatchStatus.FAILED) {
+            SlackMessageRequestDto slackMessageRequestDto = SlackMessageRequestDto.of(
+                    stepExecution.getJobExecution().getJobInstance().getJobName(),
+                    stepExecution.getLastUpdated(),
+                    stepExecution.getStepName(),
+                    stepExecution.getExitStatus().getExitCode(),
+                    stepExecution.getFailureExceptions().get(0).getCause().toString(),
+                    "김나람"
+            );
+
+            slackUtils.sendMessage(slackMessageRequestDto);
+
             return ExitStatus.FAILED;
         } else {
             return ExitStatus.COMPLETED;
@@ -46,9 +64,7 @@ public class CheckExpireCouponListener implements JobExecutionListener, StepExec
     }
 
     private String requestLogDtoToString(Object logDto) {
-        ObjectMapper objectMapper = new ObjectMapper();
-        Map map = objectMapper.convertValue(logDto, Map.class);
-        return map.toString();
+        return objectMapper.convertValue(logDto, Map.class).toString();
     }
 }
 
