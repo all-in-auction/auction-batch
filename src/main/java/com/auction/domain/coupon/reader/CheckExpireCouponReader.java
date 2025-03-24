@@ -9,6 +9,7 @@ import org.springframework.batch.item.database.Order;
 import org.springframework.batch.item.database.PagingQueryProvider;
 import org.springframework.batch.item.database.builder.JdbcPagingItemReaderBuilder;
 import org.springframework.batch.item.database.support.SqlPagingQueryProviderFactoryBean;
+import org.springframework.batch.support.DatabaseType;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -62,13 +63,13 @@ public class CheckExpireCouponReader {
     ) throws Exception {
         SqlPagingQueryProviderFactoryBean queryProvider = new SqlPagingQueryProviderFactoryBean();
         queryProvider.setDataSource(dataSource);
-        queryProvider.setSelectClause("SELECT u.id");
-        queryProvider.setFromClause("FROM coupon c JOIN coupon_user u ON c.id = u.coupon_id");
-        queryProvider.setWhereClause("WHERE c.expire_at = :expire_at AND u.is_available = true " +
-                "AND u.id BETWEEN :start AND :end");
+        queryProvider.setSelectClause("SELECT coupon_user.id");
+        queryProvider.setFromClause("FROM coupon JOIN coupon_user ON coupon.id = coupon_user.coupon_id");
+        queryProvider.setWhereClause("WHERE coupon.expire_at = :expire_at AND coupon_user.is_available = true " +
+                "AND coupon_user.id BETWEEN :start AND :end");
 
         Map<String, Order> sortKeys = new HashMap<>(1);
-        sortKeys.put("u.id", Order.ASCENDING);
+        sortKeys.put("coupon_user.id", Order.ASCENDING);
         queryProvider.setSortKeys(sortKeys);
 
         return queryProvider.getObject();

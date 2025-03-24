@@ -1,5 +1,6 @@
 package com.auction.domain.coupon.partitioner;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.partition.support.Partitioner;
 import org.springframework.batch.item.ExecutionContext;
@@ -12,14 +13,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
+@RequiredArgsConstructor
 public class CouponPartitioner implements Partitioner {
     private final JdbcOperations jdbcTemplate;
     private final LocalDate expireAt;
-
-    public CouponPartitioner(DataSource dataSource, LocalDate expireAt) {
-        this.jdbcTemplate = new JdbcTemplate(dataSource);
-        this.expireAt = expireAt;
-    }
 
     @Override
     public Map<String, ExecutionContext> partition(int gridSize) {
